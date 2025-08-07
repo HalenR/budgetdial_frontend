@@ -122,8 +122,9 @@
     </div>
   </div>
 
-  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js" const BACKEND_URL = 'https://budgetdial-backend.onrender.com'></script>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js" ></script>
   <script>
+    const BACKEND_URL = 'https://budgetdial-backend.onrender.com'
     // [Your existing JavaScript remains unchanged, paste here...]
     // (you already have good logic for Plaid, signup, budget, etc.)
     // Signup button handler
@@ -137,7 +138,7 @@
         return;
       }
 
-      const res = await fetch('${BACKEND_URL}/api/signup', {
+      const res = await fetch(`${BACKEND_URL}/api/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id, password, device_id })
@@ -159,13 +160,13 @@
     let currentPassword = null;
 
     async function createLinkToken() {
-      const res = await fetch('${BACKEND_URL}/api/create_link_token');
+      const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
       const data = await res.json();
       return data.link_token;
     }
 
     async function login(user_id, password) {
-      const res = await fetch('${BACKEND_URL}/api/login', {
+      const res = await fetch(`${BACKEND_URL}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id, password })
@@ -175,7 +176,7 @@
     }
 
     async function exchangePublicToken(public_token, user_id, password) {
-      const res = await fetch('${BACKEND_URL}/api/exchange_public_token', {
+      const res = await fetch(`${BACKEND_URL}/api/exchange_public_token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ public_token, user_id, password })
@@ -185,7 +186,7 @@
     }
 
     async function checkBudget(access_token) {
-      const res = await fetch('${BACKEND_URL}/api/budget_check', {
+      const res = await fetch(`${BACKEND_URL}/api/budget_check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access_token })
@@ -194,13 +195,19 @@
     }
 
     async function setBudget(budget) {
-      const res = await fetch('${BACKEND_URL}/api/set_budget', {
+      if (!accessToken) {
+        throw new Error("No access token available. Please connect your bank first.");
+      }
+
+      const res = await fetch('https://budgetdial-backend.onrender.com/api/set_budget_token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ budget, user_id: currentUserId })
+        body: JSON.stringify({ access_token: accessToken, budget })
       });
+
       return await res.json();
     }
+
 
     document.getElementById('link-button').addEventListener('click', async () => {
       const user_id = document.getElementById("username").value.trim();
