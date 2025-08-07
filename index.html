@@ -122,7 +122,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js" const BACKEND_URL = 'https://budgetdial-backend.onrender.com'></script>
   <script>
     // [Your existing JavaScript remains unchanged, paste here...]
     // (you already have good logic for Plaid, signup, budget, etc.)
@@ -137,7 +137,7 @@
         return;
       }
 
-      const res = await fetch('/api/signup', {
+      const res = await fetch('${BACKEND_URL}/api/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id, password, device_id })
@@ -159,13 +159,13 @@
     let currentPassword = null;
 
     async function createLinkToken() {
-      const res = await fetch('/api/create_link_token');
+      const res = await fetch('${BACKEND_URL}/api/create_link_token');
       const data = await res.json();
       return data.link_token;
     }
 
     async function login(user_id, password) {
-      const res = await fetch('/api/login', {
+      const res = await fetch('${BACKEND_URL}/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id, password })
@@ -175,7 +175,7 @@
     }
 
     async function exchangePublicToken(public_token, user_id, password) {
-      const res = await fetch('/api/exchange_public_token', {
+      const res = await fetch('${BACKEND_URL}/api/exchange_public_token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ public_token, user_id, password })
@@ -185,7 +185,7 @@
     }
 
     async function checkBudget(access_token) {
-      const res = await fetch('/api/budget_check', {
+      const res = await fetch('${BACKEND_URL}/api/budget_check', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ access_token })
@@ -194,7 +194,7 @@
     }
 
     async function setBudget(budget) {
-      const res = await fetch('/api/set_budget', {
+      const res = await fetch('${BACKEND_URL}/api/set_budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ budget, user_id: currentUserId })
