@@ -195,18 +195,27 @@
     }
 
     async function setBudget(budget) {
-      if (!accessToken) {
-        throw new Error("No access token available. Please connect your bank first.");
+      // Build payload based on what credentials we have
+      let payload = { budget };
+
+      if (accessToken) {
+        payload.access_token = accessToken;
+      } else if (currentUserId && currentPassword) {
+        payload.user_id = currentUserId;
+        payload.password = currentPassword;
+      } else {
+        throw new Error("No valid credentials available. Please log in or connect your bank first.");
       }
 
       const res = await fetch('https://budgetdial-backend.onrender.com/api/set_budget_token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: accessToken, budget })
+        body: JSON.stringify(payload)
       });
 
       return await res.json();
     }
+
 
 
     document.getElementById('link-button').addEventListener('click', async () => {
