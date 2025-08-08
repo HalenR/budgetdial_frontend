@@ -232,12 +232,15 @@
               accessToken = await exchangePublicToken(public_token, user_id, password);
               const budgetData = await checkBudget(accessToken);
 
-              document.getElementById('result').innerHTML = `
-                <p><strong>Total Spent:</strong> $${budgetData.total_spent.toFixed(2)}</p>
-                <p><strong>Budget:</strong> $${budgetData.budget.toFixed(2)}</p>
-                <p><strong>Status:</strong> ${budgetData.within_budget ? '✅ Within Budget' : '❌ Over Budget'}</p>
-              `;
+              const totalSpent = typeof budgetData.total_spent === 'number' ? budgetData.total_spent.toFixed(2) : '0.00';
+              const budget = typeof budgetData.budget === 'number' ? budgetData.budget.toFixed(2) : '0.00';
+              const status = budgetData.within_budget ? '✅ Within Budget' : '❌ Over Budget';
 
+              document.getElementById('result').innerHTML = `
+                <p><strong>Total Spent:</strong> $${totalSpent}</p>
+                <p><strong>Budget:</strong> $${budget}</p>
+                <p><strong>Status:</strong> ${status}</p>
+              `;
               // Show budget setting section
               document.getElementById('budget-section').style.display = 'block';
 
