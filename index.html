@@ -195,7 +195,6 @@
     }
 
     async function setBudget(budget) {
-      // Build payload based on what credentials we have
       let payload = { budget };
 
       if (accessToken) {
@@ -204,10 +203,10 @@
         payload.user_id = currentUserId;
         payload.password = currentPassword;
       } else {
-        throw new Error("No valid credentials available. Please log in or connect your bank first.");
+        throw new Error("No valid credentials. Please log in or connect your bank first.");
       }
 
-      const res = await fetch('https://budgetdial-backend.onrender.com/api/set_budget_token', {
+      const res = await fetch(`${BACKEND_URL}/api/set_budget`, { // ✅ fixed endpoint
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -235,33 +234,47 @@
 
         const handler = Plaid.create({
           token: linkToken,
-          onSuccess: async function(public_token, metadata) {
+          onSuccess: async function (public_token, metadata) {
             try {
+              // 1. Log in user
               await login(user_id, password);
+
+              // 2. Exchange token
               accessToken = await exchangePublicToken(public_token, user_id, password);
-              const budgetData = await checkBudget(accessToken);
 
-              const totalSpent = typeof budgetData.total_spent === 'number' ? budgetData.total_spent.toFixed(2) : '0.00';
-              const budget = typeof budgetData.budget === 'number' ? budgetData.budget.toFixed(2) : '0.00';
-              const status = budgetData.within_budget ? '✅ Within Budget' : '❌ Over Budget';
+              // 3. Get budget data
+              let budgetData = await checkBudget(accessToken);
 
-              document.getElementById('result').innerHTML = `
-                <p><strong>Total Spent:</strong> $${totalSpent}</p>
-                <p><strong>Budget:</strong> $${budget}</p>
-                <p><strong>Status:</strong> ${status}</p>
-              `;
-              // Show budget setting section
-              document.getElementById('budget-section').style.display = 'block';
+              // 4. Display budget info
+              updateBudgetUI(budgetData);
 
-              // Pre-fill budget input if available
+              // 5. Pre-fill budget input if available
               if (budgetData.budget) {
                 document.getElementById('budget-input').value = budgetData.budget;
               }
+
+              // 6. Immediately send updated budget to backend
+              if (budgetData.budget) {
+                console.log("Sending budget update to backend:", budgetData.budget);
+                await fetch(`${BACKEND_URL}/set_budget`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    user_id,
+                    password,
+                    budget: budgetData.budget
+                  })
+                });
+                console.log("Budget updated successfully on backend.");
+              }
+
+              // 7. Show budget section
+              document.getElementById('budget-section').style.display = 'block';
             } catch (err) {
               alert(err.message);
             }
           },
-          onExit: function(err, metadata) {
+          onExit: function (err, metadata) {
             if (err) {
               alert('Plaid Link error: ' + (err.display_message || err.error_message));
             } else {
@@ -275,6 +288,26 @@
         alert("Error initiating Plaid: " + err.message);
       }
     });
+
+    // Helper to update UI
+    function updateBudgetUI(budgetData) {
+      const totalSpent = typeof budgetData.total_spent === 'number'
+        ? budgetData.total_spent.toFixed(2)
+        : '0.00';
+      const budget = typeof budgetData.budget === 'number'
+        ? budgetData.budget.toFixed(2)
+        : '0.00';
+      const status = budgetData.within_budget
+        ? '✅ Within Budget'
+        : '❌ Over Budget';
+
+      document.getElementById('result').innerHTML = `
+        <p><strong>Total Spent:</strong> $${totalSpent}</p>
+        <p><strong>Budget:</strong> $${budget}</p>
+        <p><strong>Status:</strong> ${status}</p>
+      `;
+    }
+
 
     // Handle setting budget button click
     document.getElementById('set-budget-button').addEventListener('click', async () => {
