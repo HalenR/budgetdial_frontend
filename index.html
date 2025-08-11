@@ -155,9 +155,14 @@
       }
     });
 
-    let accessToken = null;
+    let accessToken = localStorage.getItem('accessToken');;
     let currentUserId = null;
     let currentPassword = null;
+
+    if (accessToken) {
+      document.getElementById('budget-section').style.display = 'block';
+      // Optionally, you could fetch and update budget info here
+    }
 
     async function createLinkToken() {
       const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
@@ -241,7 +246,7 @@
 
               // 2. Exchange token
               accessToken = await exchangePublicToken(public_token, user_id, password);
-
+              localStorage.setItem('accessToken', accessToken);
               // 3. Get budget data
               let budgetData = await checkBudget(accessToken);
 
