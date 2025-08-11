@@ -104,238 +104,279 @@
       <div id="signup-result" class="result"></div>
     </div>
 
-    <!-- Login / Bank Connect -->
-    <div class="section">
+    <!-- Login Form -->
+    <div class="section" id="login-section">
+      <h2>Login</h2>
+      <input type="text" id="login-username" placeholder="Enter Username" />
+      <input type="password" id="login-password" placeholder="Enter Password" />
+      <button id="login-button">Login</button>
+      <div id="login-result" class="result"></div>
+    </div>
+
+    <!-- Connect Bank (hidden until login) -->
+    <div class="section" id="connect-bank-section" style="display:none;">
       <h2>Connect Bank Account</h2>
-      <input type="text" id="username" placeholder="Enter Username" />
-      <input type="password" id="password" placeholder="Enter Password" />
       <button id="link-button">Connect Bank</button>
       <div id="result" class="result"></div>
     </div>
 
-    <!-- Budget Setting -->
-    <div id="budget-section" class="section">
+    <!-- Budget Setting (hidden until bank connected) -->
+    <div id="budget-section" class="section" style="display:none;">
       <h2>Set Your Budget</h2>
       <input type="number" id="budget-input" placeholder="Enter your budget" min="0" />
       <button id="set-budget-button">Set Budget</button>
       <div id="budget-result" class="result"></div>
     </div>
-  </div>
 
   <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js" ></script>
   <script>
-    const BACKEND_URL = 'https://budgetdial-backend.onrender.com'
-    // [Your existing JavaScript remains unchanged, paste here...]
-    // (you already have good logic for Plaid, signup, budget, etc.)
-    // Signup button handler
-    document.getElementById('signup-button').addEventListener('click', async () => {
-      const user_id = document.getElementById('signup-username').value.trim();
-      const password = document.getElementById('signup-password').value;
-      const device_id = document.getElementById('signup-device-id').value.trim();
+    const BACKEND_URL = 'https://budgetdial-backend.onrender.com';
 
-      if (!user_id || !password || !device_id) {
-        document.getElementById('signup-result').textContent = "Please enter username, password, and device ID.";
-        return;
-      }
+let accessToken = localStorage.getItem('accessToken');
+let currentUserId = localStorage.getItem('userId');
+let currentPassword = null; // Don't store password in localStorage for security
 
-      const res = await fetch(`${BACKEND_URL}/api/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id, password, device_id })
-      });
+// Helper to show/hide sections
+function showSection(id) {
+  ['login-section', 'connect-bank-section', 'budget-section'].forEach(sectionId => {
+    const el = document.getElementById(sectionId);
+    if (el) el.style.display = (sectionId === id) ? 'block' : 'none';
+  });
+}
 
-      const data = await res.json();
+// On page load, decide which section to show
+if (accessToken && currentUserId) {
+  showSection('budget-section');
+  // Optionally fetch and display budget info here
+  checkBudget(accessToken).then(updateBudgetUI).catch(() => {
+    // Token might be invalid, force login
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('userId');
+    accessToken = null;
+    currentUserId = null;
+    showSection('login-section');
+  });
+} else if (currentUserId) {
+  showSection('connect-bank-section');
+} else {
+  showSection('login-section');
+}
 
-      if (res.ok) {
-        document.getElementById('signup-result').style.color = 'green';
-        document.getElementById('signup-result').textContent = 'Account created successfully! You can now connect your bank.';
-      } else {
-        document.getElementById('signup-result').style.color = 'red';
-        document.getElementById('signup-result').textContent = data.error || 'Error creating account.';
-      }
+// Signup handler (unchanged)
+document.getElementById('signup-button').addEventListener('click', async () => {
+  const user_id = document.getElementById('signup-username').value.trim();
+  const password = document.getElementById('signup-password').value;
+  const device_id = document.getElementById('signup-device-id').value.trim();
+
+  if (!user_id || !password || !device_id) {
+    document.getElementById('signup-result').textContent = "Please enter username, password, and device ID.";
+    return;
+  }
+
+  const res = await fetch(`${BACKEND_URL}/api/signup`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id, password, device_id })
+  });
+
+  const data = await res.json();
+
+  if (res.ok) {
+    document.getElementById('signup-result').style.color = 'green';
+    document.getElementById('signup-result').textContent = 'Account created successfully! You can now login and connect your bank.';
+  } else {
+    document.getElementById('signup-result').style.color = 'red';
+    document.getElementById('signup-result').textContent = data.error || 'Error creating account.';
+  }
+});
+
+// Login button handler - NEW
+document.getElementById('login-button').addEventListener('click', async () => {
+  const userId = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
+
+  if (!userId || !password) {
+    document.getElementById('login-result').textContent = "Please enter username and password.";
+    document.getElementById('login-result').style.color = 'red';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId, password })
     });
 
-    let accessToken = localStorage.getItem('accessToken');;
-    let currentUserId = null;
-    let currentPassword = null;
+    const data = await res.json();
 
-    if (accessToken) {
-      document.getElementById('budget-section').style.display = 'block';
-      // Optionally, you could fetch and update budget info here
-    }
+    if (!res.ok) throw new Error(data.error || 'Login failed');
 
-    async function createLinkToken() {
-      const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
-      const data = await res.json();
-      return data.link_token;
-    }
+    currentUserId = userId;
+    currentPassword = password;
+    localStorage.setItem('userId', userId);
 
-    async function login(user_id, password) {
-      const res = await fetch(`${BACKEND_URL}/api/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id, password })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Login failed");
-    }
+    document.getElementById('login-result').style.color = 'green';
+    document.getElementById('login-result').textContent = 'Login successful! Please connect your bank.';
 
-    async function exchangePublicToken(public_token, user_id, password) {
-      const res = await fetch(`${BACKEND_URL}/api/exchange_public_token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ public_token, user_id, password })
-      });
-      const data = await res.json();
-      return data.access_token;
-    }
+    showSection('connect-bank-section');
+  } catch (err) {
+    document.getElementById('login-result').style.color = 'red';
+    document.getElementById('login-result').textContent = err.message;
+  }
+});
 
-    async function checkBudget(access_token) {
-      const res = await fetch(`${BACKEND_URL}/api/budget_check`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token })
-      });
-      return await res.json();
-    }
+async function createLinkToken() {
+  const res = await fetch(`${BACKEND_URL}/api/create_link_token`);
+  const data = await res.json();
+  return data.link_token;
+}
 
-    async function setBudget(budget) {
-      let payload = { budget };
+async function login(user_id, password) {
+  const res = await fetch(`${BACKEND_URL}/api/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id, password })
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Login failed");
+}
 
-      if (accessToken) {
-        payload.access_token = accessToken;
-      } else if (currentUserId && currentPassword) {
-        payload.user_id = currentUserId;
-        payload.password = currentPassword;
-      } else {
-        throw new Error("No valid credentials. Please log in or connect your bank first.");
-      }
+async function exchangePublicToken(public_token, user_id, password) {
+  const res = await fetch(`${BACKEND_URL}/api/exchange_public_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ public_token, user_id, password })
+  });
+  const data = await res.json();
+  return data.access_token;
+}
 
-      const res = await fetch(`${BACKEND_URL}/api/set_budget_token`, { // ✅ fixed endpoint
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+async function checkBudget(access_token) {
+  const res = await fetch(`${BACKEND_URL}/api/budget_check`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ access_token })
+  });
+  return await res.json();
+}
 
-      return await res.json();
-    }
+async function setBudget(budget) {
+  let payload = { budget };
 
+  if (accessToken) {
+    payload.access_token = accessToken;
+  } else if (currentUserId && currentPassword) {
+    payload.user_id = currentUserId;
+    payload.password = currentPassword;
+  } else {
+    throw new Error("No valid credentials. Please log in or connect your bank first.");
+  }
 
+  const res = await fetch(`${BACKEND_URL}/api/set_budget_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
 
-    document.getElementById('link-button').addEventListener('click', async () => {
-      const user_id = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value;
+  return await res.json();
+}
 
-      if (!user_id || !password) {
-        alert("Please enter both username and password");
-        return;
-      }
+// Connect Bank button handler
+document.getElementById('link-button').addEventListener('click', async () => {
+  if (!currentUserId || !currentPassword) {
+    alert("Please login before connecting your bank.");
+    showSection('login-section');
+    return;
+  }
 
-      currentUserId = user_id;
-      currentPassword = password;
+  try {
+    const linkToken = await createLinkToken();
 
-      try {
-        const linkToken = await createLinkToken();
+    const handler = Plaid.create({
+      token: linkToken,
+      onSuccess: async function (public_token, metadata) {
+        try {
+          // 1. Log in user (again to confirm)
+          await login(currentUserId, currentPassword);
 
-        const handler = Plaid.create({
-          token: linkToken,
-          onSuccess: async function (public_token, metadata) {
-            try {
-              // 1. Log in user
-              await login(user_id, password);
+          // 2. Exchange public token for access token
+          accessToken = await exchangePublicToken(public_token, currentUserId, currentPassword);
+          localStorage.setItem('accessToken', accessToken);
 
-              // 2. Exchange token
-              accessToken = await exchangePublicToken(public_token, user_id, password);
-              localStorage.setItem('accessToken', accessToken);
-              // 3. Get budget data
-              let budgetData = await checkBudget(accessToken);
+          // 3. Get budget data
+          let budgetData = await checkBudget(accessToken);
 
-              // 4. Display budget info
-              updateBudgetUI(budgetData);
+          // 4. Update UI
+          updateBudgetUI(budgetData);
 
-              // 5. Pre-fill budget input if available
-              if (budgetData.budget) {
-                document.getElementById('budget-input').value = budgetData.budget;
-              }
-
-              // 6. Immediately send updated budget to backend
-              if (budgetData.budget) {
-                console.log("Sending budget update to backend:", budgetData.budget);
-                await fetch(`${BACKEND_URL}/api/set_budget_token`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    access_token: accessToken,
-                    budget: budgetData.budget
-                  })
-                });
-                console.log("Budget updated successfully on backend.");
-              }
-
-              // 7. Show budget section
-              document.getElementById('budget-section').style.display = 'block';
-            } catch (err) {
-              alert(err.message);
-            }
-          },
-          onExit: function (err, metadata) {
-            if (err) {
-              alert('Plaid Link error: ' + (err.display_message || err.error_message));
-            } else {
-              alert('Plaid Link closed.');
-            }
+          // 5. Pre-fill budget input if available
+          if (budgetData.budget) {
+            document.getElementById('budget-input').value = budgetData.budget;
           }
-        });
 
-        handler.open();
-      } catch (err) {
-        alert("Error initiating Plaid: " + err.message);
-      }
-    });
-
-    // Helper to update UI
-    function updateBudgetUI(budgetData) {
-      const totalSpent = typeof budgetData.total_spent === 'number'
-        ? budgetData.total_spent.toFixed(2)
-        : '0.00';
-      const budget = typeof budgetData.budget === 'number'
-        ? budgetData.budget.toFixed(2)
-        : '0.00';
-      const status = budgetData.within_budget
-        ? '✅ Within Budget'
-        : '❌ Over Budget';
-
-      document.getElementById('result').innerHTML = `
-        <p><strong>Total Spent:</strong> $${totalSpent}</p>
-        <p><strong>Budget:</strong> $${budget}</p>
-        <p><strong>Status:</strong> ${status}</p>
-      `;
-    }
-
-
-    // Handle setting budget button click
-    document.getElementById('set-budget-button').addEventListener('click', async () => {
-      const budgetValue = parseFloat(document.getElementById('budget-input').value);
-      if (isNaN(budgetValue) || budgetValue < 0) {
-        document.getElementById('budget-result').style.color = 'red';
-        document.getElementById('budget-result').textContent = 'Please enter a valid positive budget number.';
-        return;
-      }
-
-      try {
-        const res = await setBudget(budgetValue);
-        if (res && res.message) {
-          document.getElementById('budget-result').style.color = 'green';
-          document.getElementById('budget-result').textContent = res.message;
-        } else {
-          document.getElementById('budget-result').style.color = 'red';
-          document.getElementById('budget-result').textContent = res.error || 'Failed to set budget.';
+          // 6. Show budget section
+          showSection('budget-section');
+        } catch (err) {
+          alert(err.message);
         }
-      } catch (err) {
-        document.getElementById('budget-result').style.color = 'red';
-        document.getElementById('budget-result').textContent = 'Error: ' + err.message;
+      },
+      onExit: function (err, metadata) {
+        if (err) {
+          alert('Plaid Link error: ' + (err.display_message || err.error_message));
+        }
       }
     });
+
+    handler.open();
+  } catch (err) {
+    alert("Error initiating Plaid: " + err.message);
+  }
+});
+
+// Update budget button handler (unchanged)
+document.getElementById('set-budget-button').addEventListener('click', async () => {
+  const budgetValue = parseFloat(document.getElementById('budget-input').value);
+  if (isNaN(budgetValue) || budgetValue < 0) {
+    document.getElementById('budget-result').style.color = 'red';
+    document.getElementById('budget-result').textContent = 'Please enter a valid positive budget number.';
+    return;
+  }
+
+  try {
+    const res = await setBudget(budgetValue);
+    if (res && res.message) {
+      document.getElementById('budget-result').style.color = 'green';
+      document.getElementById('budget-result').textContent = res.message;
+    } else {
+      document.getElementById('budget-result').style.color = 'red';
+      document.getElementById('budget-result').textContent = res.error || 'Failed to set budget.';
+    }
+  } catch (err) {
+    document.getElementById('budget-result').style.color = 'red';
+    document.getElementById('budget-result').textContent = 'Error: ' + err.message;
+  }
+});
+
+// Helper to update budget display UI
+function updateBudgetUI(budgetData) {
+  const totalSpent = typeof budgetData.total_spent === 'number'
+    ? budgetData.total_spent.toFixed(2)
+    : '0.00';
+  const budget = typeof budgetData.budget === 'number'
+    ? budgetData.budget.toFixed(2)
+    : '0.00';
+  const status = budgetData.within_budget
+    ? '✅ Within Budget'
+    : '❌ Over Budget';
+
+  document.getElementById('result').innerHTML = `
+    <p><strong>Total Spent:</strong> $${totalSpent}</p>
+    <p><strong>Budget:</strong> $${budget}</p>
+    <p><strong>Status:</strong> ${status}</p>
+  `;
+}
+
   </script>
 </body>
 </html>
