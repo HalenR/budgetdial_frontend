@@ -206,7 +206,7 @@
         throw new Error("No valid credentials. Please log in or connect your bank first.");
       }
 
-      const res = await fetch(`${BACKEND_URL}/api/set_budget`, { // ✅ fixed endpoint
+      const res = await fetch(`${BACKEND_URL}/api/set_budget_token`, { // ✅ fixed endpoint
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -256,12 +256,11 @@
               // 6. Immediately send updated budget to backend
               if (budgetData.budget) {
                 console.log("Sending budget update to backend:", budgetData.budget);
-                await fetch(`${BACKEND_URL}/set_budget`, {
+                await fetch(`${BACKEND_URL}/api/set_budget_token`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
-                    user_id,
-                    password,
+                    access_token: accessToken,
                     budget: budgetData.budget
                   })
                 });
